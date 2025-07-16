@@ -182,6 +182,9 @@ def parse_esf(input_path, valid_names=None):
         # Determine classification based on rules
         second_col = parts[1].lower() if len(parts) > 1 else ""
         if config["KNX_CLASSIFIER_LIGHT"] in first_col[0].lower():
+            # Skip if the original name starts with "st/"
+            if any(parts[1].strip().lower().startswith(prefix) for prefix in ("w/", "rd/", "st/", "st_w/")):
+                continue
             classification = "beleuchtung"
         elif config["KNX_CLASSIFIER_COVER"] in first_col[0].lower() and config["KNX_CLASSIFIER_JALOUSIE"] in second_col:
             classification = "jalousie"
