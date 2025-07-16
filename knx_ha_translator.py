@@ -31,8 +31,10 @@ CONSTANTS = {
     "STOP_ADDRESS": "Stopp",
     "POSITION_STATE_ADDRESS": "Status Position",
     "POSITION_ADDRESS": "Position",
-    "STANDARD_TRAVELLING_TIME_LONG": 14, # Default travelling time for long covers in seconds, can be overridden in config
-    "STANDARD_TRAVELLING_TIME_SHORT": 8, # Default travelling time for short covers in seconds, can be overridden in config
+    "ANGLE_STATE_ADDRESS": "Status Lamelle",
+    "ANGLE_ADDRESS": "Lamelle",
+    "STANDARD_TRAVELLING_TIME_LONG": 60, # Default travelling time for long covers in seconds, can be overridden in config
+    "STANDARD_TRAVELLING_TIME_SHORT": 30, # Default travelling time for short covers in seconds, can be overridden in config
 }
 config = {}
 
@@ -308,12 +310,20 @@ def create_ha_yaml(rows):
             stop_address = find_address(config["STOP_ADDRESS"])
             position_state_address = find_address(config["POSITION_STATE_ADDRESS"])
             position_address = find_address(config["POSITION_ADDRESS"], notsubstring=config["POSITION_STATE_ADDRESS"])
+            angle_state_address = find_address(config["ANGLE_STATE_ADDRESS"])
+            angle_address = find_address(config["ANGLE_ADDRESS"], notsubstring=config["ANGLE_STATE_ADDRESS"])
             
             yaml_content += f'    - name: "{name}"\n'
             yaml_content += f'      move_long_address: "{move_long_address}"\n'
+            yaml_content += f'      move_short_address: "{stop_address}"\n'
             yaml_content += f'      stop_address: "{stop_address}"\n'
             yaml_content += f'      position_address: "{position_address}"\n'
             yaml_content += f'      position_state_address: "{position_state_address}"\n'
+            # Add angle addresses only for jalousie covers
+            cover_classification = next((row[2] for row in relevant_rows), None)
+            if cover_classification == "jalousie":
+                yaml_content += f'      angle_address: "{angle_address}"\n'
+                yaml_content += f'      angle_state_address: "{angle_state_address}"\n'
             # TODO: Add travelling time based on size
             yaml_content += f'      travelling_time_down: "{config["STANDARD_TRAVELLING_TIME_LONG"]}"\n'
             yaml_content += f'      travelling_time_up: "{config["STANDARD_TRAVELLING_TIME_LONG"]}"\n'
