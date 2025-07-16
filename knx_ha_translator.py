@@ -199,7 +199,11 @@ def parse_esf(input_path, valid_names=None):
         
         # Determine name based on valid names or default
         def clean_name(name):
-            name = parts[1].replace(' ', '_').lower()
+            # Remove leading and trailing spaces
+            name = name.strip()
+            # Remove underscores at the beginning and end
+            name = name.lstrip('_').rstrip('_')
+            
             # If 'jal' or 'rollo' is in the name, cut off after that word (inclusive)
             for keyword in ("jal", "rollo"):
                 idx = name.find(keyword)
@@ -283,10 +287,9 @@ def create_ha_yaml(rows):
     yaml_content = "knx:\n"
     
     # Write the lights section
-    # FIXME: Check the prefixes that probably cause duplicates
     lights = [(address, name) for address, name, classification, action in rows if classification == "beleuchtung"]
     if lights:
-        yaml_content += "  lights:\n"
+        yaml_content += "  light:\n"
         for address, name in lights:
             yaml_content += f'    - name: "{name}"\n'
             yaml_content += f'      address: "{address}"\n'
@@ -298,10 +301,15 @@ def create_ha_yaml(rows):
     if covers:
         yaml_content += "  cover:\n"
         # Get unique names for covers
-        unique_names = sorted(set(name for _, name, _, _ in covers))
+        def remove_last_word(name):
+            return name.rsplit(' ', 1)[0] if ' ' in name else name
+
+        unique_names = sorted(set(remove_last_word(name) for _, name, _, _ in covers))
+        
+        # Iterate over unique cover names
         for name in unique_names:
             # Find all rows for this cover name
-            relevant_rows = [row for row in covers if row[1] == name]
+            relevant_rows = [row for row in covers if name in row[1]]
             # Helper to find address by action substring
             def find_address(substring, notsubstring=None):
                 for address, _, _, action in relevant_rows:
@@ -351,6 +359,7 @@ def write_buttons_file(rows, output_path):
     def format_button_name(name):
         # Format the name as in Home Assistant config, but convert German umlauts
         name = name.replace(' ', '_').lower()
+        name = name.replace('.', '_')
         name = name.replace('ä', 'a').replace('ö', 'o').replace('ü', 'u')
         # If 'jal' or 'rollo' is in the name, cut off after that word (inclusive)
         for keyword in ("jal", "rollo"):
@@ -372,9 +381,22 @@ def write_buttons_file(rows, output_path):
         # Write buttons for unique covers (jalousie, rollo)
         txt_file.write("\n# Buttons for covers\n")
         covers = [(address, name, classification, action) for address, name, classification, action in rows if classification in ("jalousie", "rollo")]
-        unique_names = sorted(set(name for _, name, _, _ in covers))
+        
+        # Get unique names for covers
+        def remove_last_word(name):
+            return name.rsplit(' ', 1)[0] if ' ' in name else name
+
+        unique_names = sorted(set(remove_last_word(name) for _, name, _, _ in covers))
+        
+        # Iterate over unique cover names and write buttons
         for name in unique_names:
-            txt_file.write(f'- type: entity\n  entity: cover.{format_button_name(name)}\n')
+            # Add cover specific buttons
+            cover_classification = next((row[2] for row in covers if row[0] == name), None)
+            # FIXME: does not work for jalousie covers
+            if cover_classification == "jalousie":
+                txt_file.write(f'- type: tile\n  entity: cover.{format_button_name(name)}\n  features_position: bottom\n  vertical: false\n')
+            else:
+                txt_file.write(f'- type: entity\n  entity: cover.{format_button_name(name)}\n')
         
         # TODO: Add further knx entities if needed
 
