@@ -360,6 +360,7 @@ def write_buttons_file(rows, output_path):
         # Format the name as in Home Assistant config, but convert German umlauts
         name = name.replace(' ', '_').lower()
         name = name.replace('.', '_')
+        name = name.replace('/', '_')
         name = name.replace('ä', 'a').replace('ö', 'o').replace('ü', 'u')
         # If 'jal' or 'rollo' is in the name, cut off after that word (inclusive)
         for keyword in ("jal", "rollo"):
@@ -390,9 +391,11 @@ def write_buttons_file(rows, output_path):
         
         # Iterate over unique cover names and write buttons
         for name in unique_names:
-            # Add cover specific buttons
-            cover_classification = next((row[2] for row in covers if row[0] == name), None)
-            # FIXME: does not work for jalousie covers
+            # Add cover specific buttons  
+            # Find all rows for this cover name
+            relevant_rows = [row for row in covers if remove_last_word(row[1]) == name]
+            # Determine if any of the relevant rows is a jalousie
+            cover_classification = next((row[2] for row in relevant_rows if row[2] == "jalousie"), "rollo")
             if cover_classification == "jalousie":
                 txt_file.write(f'- type: tile\n  entity: cover.{format_button_name(name)}\n  features_position: bottom\n  vertical: false\n')
             else:
