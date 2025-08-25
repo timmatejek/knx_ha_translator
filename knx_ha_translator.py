@@ -16,6 +16,8 @@ import sys
 import os
 import csv
 
+# FIXME: dachkuppel not recognized
+
 #### Constants ####
 CONSTANTS = {
     # General
