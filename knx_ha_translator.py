@@ -116,25 +116,52 @@ def validate_names_file(names_file_path):
     
     # Check if the names file has exactly two columns per row and correct header
     names_content = []
-    with open(names_file_path, newline='', encoding="utf-8") as csvfile:
-        reader = csv.reader(csvfile)
+    # Try to open the file with different encodings
+    encodings_to_try = ["utf-8", "utf-8-sig", "latin1"]
+    names_file = None
+    for enc in encodings_to_try:
         try:
-            first_row = next(reader)
-        except StopIteration:
-            print("Error: Names file is empty.")
+            names_file = open(names_file_path, newline='', encoding=enc)
+            # Try reading a line to check if decoding works
+            names_file.readline()
+            names_file.seek(0)
+            break
+        except UnicodeDecodeError:
+            if names_file:
+                names_file.close()
+            names_file = None
+            continue
+
+    if names_file is None:
+        print(f"Error: Could not decode file '{names_file_path}' with utf-8, utf-8-sig, or latin1.")
+        return None
+
+    # Proceed with CSV reading
+    names_content = []
+    reader = csv.reader(names_file)
+    try:
+        first_row = next(reader)
+    except StopIteration:
+        print("Error: Names file is empty.")
+        names_file.close()
+        return None
+
+    # Remove BOM from the first column if present
+    first_row = [col.lstrip('\ufeff').strip() for col in first_row]
+    if first_row != ["ID", "Name"]:
+        print("Error: The first row of the names file must be: ID, Name")
+        names_file.close()
+        return None
+
+    for row in reader:
+        if len(row) != 2:
+            print("Error: Names file must have exactly two columns per row.")
+            names_file.close()
             return None
-        
-        # Remove BOM from the first column if present
-        first_row = [col.lstrip('\ufeff').strip() for col in first_row] 
-        if first_row != ["ID", "Name"]:
-            print("Error: The first row of the names file must be: ID, Name")
-            return None
-        for row in reader:
-            if len(row) != 2:
-                print("Error: Names file must have exactly two columns per row.")
-                return None
-            names_content.append(row)
-            
+        names_content.append(row)
+
+    names_file.close()
+         
     return names_content
 
 # Function to parse the ESF file and extract address and name pairs
@@ -239,39 +266,64 @@ def load_config(config_file):
         print(f"Error: File '{config_file}' does not exist.")
         return None
     
-    with open(config_file, newline='', encoding="utf-8") as csvfile:
-        reader = csv.reader(csvfile)
-        prod_constants = {}
-        
+    # FIXME: check encoding
+    # Try to open the config file with different encodings
+    encodings_to_try = ["utf-8", "utf-8-sig", "latin1"]
+    config_fh = None
+    for enc in encodings_to_try:
         try:
-            first_row = next(reader)
-        except StopIteration:
-            print("Error: Names file is empty.")
-            return None
-        
-        # Remove BOM from the first column if present
-        first_row = [col.lstrip('\ufeff').strip() for col in first_row] 
-        if first_row != ["Key", "Value"]:
-            print("Error: The first row of the config file must be: Key, Value")
-            return None
-        
-        # Iterate through CONSTANTS and set default values
-        for key in CONSTANTS:
-            prod_constants[key] = CONSTANTS[key]
+            config_fh = open(config_file, newline='', encoding=enc)
+            config_fh.readline()
+            config_fh.seek(0)
+            break
+        except UnicodeDecodeError:
+            if config_fh:
+                config_fh.close()
+            config_fh = None
+            continue
 
-        # Now update with values from config file if present
-        for row in reader:
-            if len(row) != 2:
-                print("Error: Config file must have exactly two columns per row.")
-                return None
-            else:
-                key, value = row
-                if key.strip() in CONSTANTS:
-                    prod_constants[key.strip()] = value.strip()
-                else:
-                    prod_constants[key.strip()] = CONSTANTS.get(key.strip(), value.strip())
-                
-        return prod_constants
+    if config_fh is None:
+        print(f"Error: Could not decode file '{config_file}' with utf-8, utf-8-sig, or latin1.")
+        return None
+
+    # Proceed with CSV reading
+    reader = csv.reader(config_fh)
+    prod_constants = {}
+
+    try:
+        first_row = next(reader)
+    except StopIteration:
+        print("Error: Config file is empty.")
+        config_fh.close()
+        return None
+
+    # Remove BOM from the first column if present
+    first_row = [col.lstrip('\ufeff').strip() for col in first_row]
+    if first_row != ["Key", "Value"]:
+        print("Error: The first row of the config file must be: Key, Value")
+        config_fh.close()
+        return None
+
+    # Initialize with default values
+    for key in CONSTANTS:
+        prod_constants[key] = CONSTANTS[key]
+
+    # Update with values from config file
+    for row in reader:
+        if len(row) != 2:
+            print("Error: Config file must have exactly two columns per row.")
+            config_fh.close()
+            return None
+        key, value = row
+        key = key.strip()
+        value = value.strip()
+        if key in CONSTANTS:
+            prod_constants[key] = value
+        else:
+            prod_constants[key] = CONSTANTS.get(key, value)
+
+    config_fh.close()
+    return prod_constants
 
 ###### Option Functionality ######
 # Function to write the extracted data to a CSV file
